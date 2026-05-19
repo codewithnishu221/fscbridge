@@ -85,17 +85,33 @@ public class AuditService {
 
         auditLogRepository.save(entry);
     }
+    public void logJobFailed(String jobId, String errorMessage) {
+        log.error("Job failed: {} | reason: {}", jobId, errorMessage);
 
-    public List<String> getTragetIdsForRollback(String jobId){
+        AuditLog entry = AuditLog.builder()
+                .jobId(jobId)
+                .action("JOB_FAILED")
+                .success(false)
+                .errorMessage(errorMessage)
+                .build();
+
+        auditLogRepository.save(entry);
+    }
+
+    public List<String> getTargetIdsForRollback(String jobId) {
         log.info("Preparing rollback for job: {}", jobId);
-        List<AuditLog> migratedEntries = auditLogRepository.findByJobIdAndAction(jobId, "RECORD_MIGRATED");
+
+        List<AuditLog> migratedEntries = auditLogRepository
+                .findByJobIdAndAction(jobId, "RECORD_MIGRATED");
 
         List<String> targetIds = migratedEntries.stream()
                 .map(AuditLog::getTargetRecordId)
-                .filter(id -> id!= null && !id.isEmpty())
+                .filter(id -> id != null && !id.isEmpty())
                 .toList();
+
         log.info("Found {} records to rollback for job {}",
                 targetIds.size(), jobId);
+
         return targetIds;
     }
 

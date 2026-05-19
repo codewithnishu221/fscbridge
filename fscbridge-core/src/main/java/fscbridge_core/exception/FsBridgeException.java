@@ -13,7 +13,7 @@ public class FsBridgeException extends RuntimeException {
         super(message, cause);
         this.errorcode = errorcode;
     }
-    public  String getErrorcode(){
+    public  String getErrorCode(){
         return errorcode;
     }
     @Override

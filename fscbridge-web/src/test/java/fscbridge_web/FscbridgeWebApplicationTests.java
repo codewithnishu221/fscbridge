@@ -1,10 +1,10 @@
-package fsbridge_mapper;
+package fscbridge_web;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class FsbridgeMapperApplicationTests {
+class FscbridgeWebApplicationTests {
 
 	@Test
 	void contextLoads() {

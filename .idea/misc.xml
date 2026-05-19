@@ -9,6 +9,9 @@
         <option value="$PROJECT_DIR$/fsbridge-mapper/pom.xml" />
         <option value="$PROJECT_DIR$/fscbridge-audit/untitled/pom.xml" />
         <option value="$PROJECT_DIR$/fscbridge-audit/pom.xml" />
+        <option value="$PROJECT_DIR$/fscbridge-web/pom.xml" />
+        <option value="$PROJECT_DIR$/fscbridge-connector/pom.xml" />
+        <option value="$PROJECT_DIR$/fscbridge-mapper/pom.xml" />
       </list>
     </option>
     <option name="ignoredFiles">
