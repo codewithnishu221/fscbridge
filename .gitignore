@@ -1,0 +1,12 @@
+# Local Spring profile files
+**/application-local.yml
+**/application-local.yaml
+
+# IntelliJ
+.idea/
+
+# Build folders
+target/
+
+# Logs
+*.log

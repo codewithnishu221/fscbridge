@@ -52,11 +52,11 @@ public class OAuthService {
             String tokenUrl = properties.getLoginUrl() + "/services/oauth2/token";
             log.debug("Calling Salesforce OAuth endpoint: {}", tokenUrl);
             MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
-            requestBody.add("grant_type", "password");
+            requestBody.add("grant_type", "client_credentials");
             requestBody.add("client_id", properties.getClientId());
             requestBody.add("client_secret", properties.getClientSecret());
-            requestBody.add("userName", properties.getUsername());
-            requestBody.add("password", properties.getPassword());
+//            requestBody.add("userName", properties.getUsername());
+//            requestBody.add("password", properties.getPassword());
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);

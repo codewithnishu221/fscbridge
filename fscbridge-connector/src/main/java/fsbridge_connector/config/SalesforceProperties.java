@@ -13,8 +13,9 @@ public class SalesforceProperties {
     private String clientId;
     private String clientSecret;
     private String loginUrl;
-    private String username;
-    private String password;
+    private String grantType;
+//    private String username;
+//    private String password;
     private String apiVersion = "v59.0";
 
 }

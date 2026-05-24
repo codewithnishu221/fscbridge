@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -26,25 +27,41 @@ public class MigrationService {
 
 
     public MigrationJob runMigration(MigrationJob job) {
-        log.info("Starting migration job: {} | object: {} → {}",
-                job.getJobId(),
-                job.getSourceObject(),
-                job.getTargetObject());
 
-       job.setStatus(JobStatus.RUNNING);
+        if (job.getJobId() == null) {
+            job.setJobId(UUID.randomUUID().toString());
+        }
+        log.info("Starting migration job: {} | dryRun: {}",
+                job.getJobId(), job.isDryRun());
+
+        job.setStatus(JobStatus.RUNNING);
         job.setStartedAt(LocalDateTime.now());
-
         auditService.logJobStarted(job);
 
         try {
-            log.info("Querying records from source org...");
+            List<SalesforceRecord> sourceRecords;
+
+            log.info("Connecting to Salesforce...");
+
             String soqlQuery = buildSoqlQuery(job.getSourceObject());
-            List<SalesforceRecord> sourceRecords =
-                    salesforceClient.queryRecords(soqlQuery);
+
+            sourceRecords = salesforceClient.queryRecords(soqlQuery);
+
+            log.info("Successfully fetched {} records from Salesforce",
+                    sourceRecords.size());
+
+            if (job.isDryRun()) {
+                log.info("DRY RUN ENABLED - No records will be inserted");
+            }
+//            else {
+//
+//                String soqlQuery = buildSoqlQuery(job.getSourceObject());
+//
+//                sourceRecords = salesforceClient.queryRecords(soqlQuery);
+//            }
 
             job.setTotalRecords(sourceRecords.size());
-            log.info("Found {} records to migrate", sourceRecords.size());
-
+            log.info("Processing {} records", sourceRecords.size());
 
             int successCount = 0;
             int failureCount = 0;
@@ -52,7 +69,6 @@ public class MigrationService {
 
             for (SalesforceRecord sourceRecord : sourceRecords) {
                 try {
-
                     SalesforceRecord mappedRecord = fieldMapperService.mapRecord(
                             sourceRecord,
                             job.getTargetObject()
@@ -60,44 +76,28 @@ public class MigrationService {
 
                     if (job.isDryRun()) {
                         log.debug("DRY RUN: Would insert record {} as {}",
-                                sourceRecord.getId(),
-                                job.getTargetObject());
+                                sourceRecord.getId(), job.getTargetObject());
                         mappedRecord.setMigrated(true);
                         successCount++;
-
                     } else {
-
                         String targetId = salesforceClient.insertRecord(
                                 job.getTargetObject(),
                                 mappedRecord.getFields()
                         );
-
                         mappedRecord.setMigrated(true);
                         mappedRecord.setTargetId(targetId);
-
                         auditService.logRecordSuccess(
-                                job.getJobId(),
-                                sourceRecord,
-                                targetId
-                        );
-
+                                job.getJobId(), sourceRecord, targetId);
                         successCount++;
-                        log.debug("Migrated record {} → {}", sourceRecord.getId(), targetId);
                     }
-
                     processedRecords.add(mappedRecord);
 
                 } catch (Exception e) {
                     failureCount++;
-                    log.error("Failed to migrate record {}: {}",
+                    log.error("Failed to process record {}: {}",
                             sourceRecord.getId(), e.getMessage());
-
                     auditService.logRecordFailure(
-                            job.getJobId(),
-                            sourceRecord,
-                            e.getMessage()
-                    );
-
+                            job.getJobId(), sourceRecord, e.getMessage());
                     sourceRecord.setMigrated(false);
                     sourceRecord.setErrorMessage(e.getMessage());
                     processedRecords.add(sourceRecord);
@@ -112,25 +112,21 @@ public class MigrationService {
 
             auditService.logJobCompleted(job);
 
-            log.info("Migration job {} completed. Success: {} | Failed: {}",
+            log.info("Job {} completed. Success: {} | Failed: {}",
                     job.getJobId(), successCount, failureCount);
 
             return job;
 
         } catch (Exception e) {
-            log.error("Migration job {} failed fatally: {}", job.getJobId(), e.getMessage());
-
+            log.error("Job {} failed: {}", job.getJobId(), e.getMessage());
             job.setStatus(JobStatus.FAILED);
             job.setFailureReason(e.getMessage());
             job.setCompletedAt(LocalDateTime.now());
-
             auditService.logJobFailed(job.getJobId(), e.getMessage());
-
             throw new FsBridgeException("JOB_FAILED",
                     "Migration job failed: " + e.getMessage(), e);
         }
     }
-
     public int rollback(String jobId, String objectType) {
         log.info("Starting rollback for job: {}", jobId);
 
