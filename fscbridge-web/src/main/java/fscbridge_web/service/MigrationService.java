@@ -7,6 +7,7 @@ import fscbridge_core.model.MigrationJob;
 import fscbridge_core.model.SalesforceRecord;
 import fsbridge_connector.client.SalesforceClient;
 import fsbridge_mapper.service.FieldMapperService;
+import fscbridge_web.kafka.producer.MigrationEventProducer;
 import fscbridge_web.metrics.MigrationMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ public class MigrationService {
     private final FieldMapperService fieldMapperService;
     private final AuditService auditService;
     private final MigrationMetrics migrationMetrics;
+    private final MigrationEventProducer eventProducer;
 
     public MigrationJob runMigration(MigrationJob job) {
 
@@ -41,6 +43,8 @@ public class MigrationService {
         job.setStatus(JobStatus.RUNNING);
         job.setStartedAt(LocalDateTime.now());
         auditService.logJobStarted(job);
+
+        eventProducer.publishJobStarted(job);
 
         try {
             List<SalesforceRecord> sourceRecords;
@@ -83,6 +87,13 @@ public class MigrationService {
                                 sourceRecord.getId(), job.getTargetObject());
                         mappedRecord.setMigrated(true);
                         successCount++;
+
+                        eventProducer.publishRecordMigrated(
+                                job.getJobId(),
+                                sourceRecord,
+                                "DRY_RUN",
+                                successCount,
+                                sourceRecords.size());
                     } else {
                         String targetId = salesforceClient.insertRecord(
                                 job.getTargetObject(),
@@ -93,6 +104,13 @@ public class MigrationService {
                         auditService.logRecordSuccess(
                                 job.getJobId(), sourceRecord, targetId);
                         successCount++;
+
+                        eventProducer.publishRecordMigrated(
+                                job.getJobId(),
+                                sourceRecord,
+                                targetId,
+                                successCount,
+                                sourceRecords.size());
                     }
                     processedRecords.add(mappedRecord);
 
@@ -102,6 +120,10 @@ public class MigrationService {
                             sourceRecord.getId(), e.getMessage());
                     auditService.logRecordFailure(
                             job.getJobId(), sourceRecord, e.getMessage());
+
+                    eventProducer.publishRecordFailed(
+                            job.getJobId(), sourceRecord, e.getMessage());
+
                     sourceRecord.setMigrated(false);
                     sourceRecord.setErrorMessage(e.getMessage());
                     processedRecords.add(sourceRecord);
@@ -116,6 +138,8 @@ public class MigrationService {
 
             auditService.logJobCompleted(job);
 
+            eventProducer.publishJobCompleted(job);
+
             long duration = System.currentTimeMillis() - startTime;
             migrationMetrics.recordJobCompleted(duration, successCount, failureCount);
 
@@ -127,6 +151,10 @@ public class MigrationService {
         } catch (Exception e) {
             log.error("Job {} failed: {}", job.getJobId(), e.getMessage());
             migrationMetrics.recordJobFailed();
+
+            eventProducer.publishJobFailed(
+                    job.getJobId(), job.getJobName(), e.getMessage());
+
             job.setStatus(JobStatus.FAILED);
             job.setFailureReason(e.getMessage());
             job.setCompletedAt(LocalDateTime.now());
@@ -140,6 +168,7 @@ public class MigrationService {
 
         migrationMetrics.recordRollback();
         auditService.logRollbackStarted(jobId);
+        eventProducer.publishRollbackStarted(jobId);
 
         List<String> targetIds = auditService.getTargetIdsForRollback(jobId);
 
@@ -163,6 +192,7 @@ public class MigrationService {
         }
 
         auditService.logRollbackCompleted(jobId, deletedCount);
+        eventProducer.publishRollbackCompleted(jobId, deletedCount);
 
         log.info("Rollback complete for job {}. Deleted {} records.", jobId, deletedCount);
         return deletedCount;
