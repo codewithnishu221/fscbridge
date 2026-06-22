@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FSC-Bridge | Live Migration Dashboard</title>
+
+    <!-- SockJS + STOMP for WebSocket -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* ── HEADER ─────────────────────────────── */
+        .header {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .header h1 span { color: #64b5f6; }
+
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #90caf9;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f44336;
+            transition: background 0.3s;
+        }
+
+        .dot.connected { background: #4caf50; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ── MAIN LAYOUT ────────────────────────── */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        /* ── JOB CONFIG PANEL ───────────────────── */
+        .config-panel {
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 28px;
+        }
+
+        .config-panel h2 {
+            font-size: 16px;
+            color: #90caf9;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #7986cb;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: #0f1117;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 11px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1565c0, #1976d2);
+            color: #fff;
+        }
+
+        .btn-primary:hover { background: linear-gradient(135deg, #1976d2, #2196f3); transform: translateY(-1px); }
+        .btn-primary:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #e65100, #f57c00);
+            color: #fff;
+        }
+
+        .btn-warning:hover { transform: translateY(-1px); }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #b71c1c, #d32f2f);
+            color: #fff;
+        }
+
+        /* ── STATS ROW ──────────────────────────── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-card .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #546e7a;
+        }
+
+        .stat-total .value { color: #90caf9; }
+        .stat-success .value { color: #66bb6a; }
+        .stat-failed .value { color: #ef5350; }
+        .stat-progress .value { color: #ffa726; }
+        .stat-status .value { font-size: 14px; color: #ce93d8; }
+
+        /* ── PROGRESS BAR ───────────────────────── */
+        .progress-section {
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 28px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            font-size: 13px;
+        }
+
+        .progress-label { color: #90caf9; font-weight: 600; }
+        .progress-pct { color: #ffa726; font-weight: 700; font-size: 18px; }
+
+        .progress-bar-track {
+            height: 14px;
+            background: #0f1117;
+            border-radius: 7px;
+            overflow: hidden;
+            border: 1px solid #2a2a4a;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #1565c0, #2196f3, #64b5f6);
+            border-radius: 7px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-bar-fill.complete {
+            background: linear-gradient(90deg, #2e7d32, #43a047, #66bb6a);
+        }
+
+        .progress-bar-fill.failed {
+            background: linear-gradient(90deg, #b71c1c, #d32f2f, #ef5350);
+        }
+
+        /* ── TWO COLUMN LAYOUT ──────────────────── */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* ── EVENT LOG ──────────────────────────── */
+        .event-panel {
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            color: #90caf9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .clear-btn {
+            font-size: 11px;
+            color: #546e7a;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 4px 8px;
+        }
+
+        .clear-btn:hover { color: #ef5350; }
+
+        .event-log {
+            height: 320px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+
+        .event-log::-webkit-scrollbar { width: 4px; }
+        .event-log::-webkit-scrollbar-track { background: #0f1117; }
+        .event-log::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 2px; }
+
+        .log-entry {
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+        }
+
+        .log-entry:hover { background: rgba(255,255,255,0.03); }
+
+        .log-time { color: #546e7a; flex-shrink: 0; font-size: 11px; }
+
+        .log-type {
+            flex-shrink: 0;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        .type-started { background: #1565c0; color: #fff; }
+        .type-migrated { background: #2e7d32; color: #fff; }
+        .type-failed { background: #b71c1c; color: #fff; }
+        .type-completed { background: #4a148c; color: #fff; }
+        .type-rollback { background: #e65100; color: #fff; }
+        .type-default { background: #37474f; color: #fff; }
+
+        .log-msg { color: #b0bec5; flex: 1; }
+
+        /* ── AI SUMMARY PANEL ───────────────────── */
+        .summary-panel {
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            background: #4a148c;
+            color: #ce93d8;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .summary-content {
+            height: 280px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.8;
+            color: #b0bec5;
+            padding-right: 4px;
+        }
+
+        .summary-placeholder {
+            color: #37474f;
+            text-align: center;
+            padding-top: 60px;
+            font-size: 13px;
+        }
+
+        .summary-placeholder .icon { font-size: 32px; margin-bottom: 12px; }
+
+        /* ── JOB ID DISPLAY ─────────────────────── */
+        .job-id-bar {
+            background: #0d1b2a;
+            border: 1px solid #1565c0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .job-id-bar.hidden { display: none; }
+        .job-id-label { color: #546e7a; flex-shrink: 0; }
+        .job-id-value { color: #64b5f6; flex: 1; word-break: break-all; }
+
+        /* ── AI SUGGEST ─────────────────────────── */
+        .ai-panel {
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+
+        .ai-input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .ai-input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            background: #0f1117;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        .ai-result {
+            background: #0f1117;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 14px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #b0bec5;
+            min-height: 60px;
+            white-space: pre-wrap;
+        }
+
+        /* ── NATURAL LANGUAGE ───────────────────── */
+        .nl-input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nl-input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            background: #0f1117;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        .nl-input-row input::placeholder { color: #546e7a; }
+
+        /* ── TOAST ──────────────────────────────── */
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            background: #1e1e2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            padding: 14px 20px;
+            font-size: 13px;
+            color: #e0e0e0;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 320px;
+        }
+
+        .toast.show { opacity: 1; }
+        .toast.success { border-color: #2e7d32; }
+        .toast.error { border-color: #b71c1c; }
+
+        @media (max-width: 900px) {
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            .stats-row { grid-template-columns: repeat(3, 1fr); }
+            .two-col { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────── -->
+<div class="header">
+    <h1>FSC<span>-Bridge</span> Dashboard</h1>
+    <div class="connection-badge">
+        <div class="dot" id="connectionDot"></div>
+        <span id="connectionStatus">Connecting...</span>
+    </div>
+</div>
+
+<!-- ── MAIN ────────────────────────────────────────────── -->
+<div class="container">
+
+    <!-- Job Config Panel -->
+    <div class="config-panel">
+        <h2>New Migration Job</h2>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Job Name</label>
+                <input type="text" id="jobName"
+                       placeholder="e.g. Migrate FinancialAccount May 2026">
+            </div>
+            <div class="form-group">
+                <label>Source Object (FSC Managed Package)</label>
+                <select id="sourceObject">
+                    <option value="Account">Account (Standard)</option>
+                    <option value="FinServ__FinancialAccount__c">FinServ__FinancialAccount__c</option>
+                    <option value="FinServ__Household__c">FinServ__Household__c</option>
+                    <option value="FinServ__FinancialGoal__c">FinServ__FinancialGoal__c</option>
+                    <option value="Contact">Contact (Standard)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Target Object (FSC Core)</label>
+                <select id="targetObject">
+                    <option value="Account">Account</option>
+                    <option value="FinancialAccount">FinancialAccount</option>
+                    <option value="AccountGroup">AccountGroup (Household)</option>
+                    <option value="FinancialGoal">FinancialGoal</option>
+                    <option value="Contact">Contact</option>
+                </select>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-warning" onclick="startMigration(false)">
+                🚀 Start Real Migration
+            </button>
+            <button class="btn btn-primary" onclick="startMigration(true)">
+                🔍 Dry Run (No Writes)
+            </button>
+            <button class="btn btn-danger" id="rollbackBtn"
+                    onclick="triggerRollback()" style="display:none">
+                ↩ Rollback
+            </button>
+        </div>
+    </div>
+
+    <!-- Job ID Bar -->
+    <div class="job-id-bar hidden" id="jobIdBar">
+        <span class="job-id-label">Active Job ID:</span>
+        <span class="job-id-value" id="jobIdDisplay">—</span>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+        <div class="stat-card stat-total">
+            <div class="value" id="totalRecords">0</div>
+            <div class="label">Total Records</div>
+        </div>
+        <div class="stat-card stat-success">
+            <div class="value" id="successCount">0</div>
+            <div class="label">Migrated</div>
+        </div>
+        <div class="stat-card stat-failed">
+            <div class="value" id="failedCount">0</div>
+            <div class="label">Failed</div>
+        </div>
+        <div class="stat-card stat-progress">
+            <div class="value" id="progressPct">0%</div>
+            <div class="label">Progress</div>
+        </div>
+        <div class="stat-card stat-status">
+            <div class="value" id="jobStatus">IDLE</div>
+            <div class="label">Status</div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-section">
+        <div class="progress-header">
+            <span class="progress-label" id="progressLabel">
+                Waiting for migration to start...
+            </span>
+            <span class="progress-pct" id="progressPctLarge">0%</span>
+        </div>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+    </div>
+
+    <!-- Event Log + AI Summary -->
+    <div class="two-col">
+
+        <!-- Event Log -->
+        <div class="event-panel">
+            <div class="panel-header">
+                <span class="panel-title">📋 Live Event Log</span>
+                <button class="clear-btn" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="event-log" id="eventLog">
+                <div class="log-entry">
+                    <span class="log-time">--:--:--</span>
+                    <span class="log-type type-default">SYS</span>
+                    <span class="log-msg">
+                        Dashboard ready. Start a migration to see live events.
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Summary -->
+        <div class="summary-panel">
+            <div class="panel-header">
+                <span class="panel-title">
+                    🤖 AI Summary
+                    <span class="ai-badge">Gemini</span>
+                </span>
+            </div>
+            <div class="summary-content" id="aiSummary">
+                <div class="summary-placeholder">
+                    <div class="icon">✨</div>
+                    AI summary will appear here after migration completes.
+                    Gemini will analyze the results and provide plain English
+                    recommendations.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Field Mapping Suggester -->
+    <div class="ai-panel">
+        <div class="panel-header">
+            <span class="panel-title">
+                🤖 AI Field Mapping Suggester
+                <span class="ai-badge">Gemini</span>
+            </span>
+        </div>
+        <p style="font-size:12px;color:#546e7a;margin-bottom:14px">
+            Enter a custom Salesforce field name and AI will suggest
+            the best FSC Core mapping.
+        </p>
+        <div class="ai-input-row">
+            <input type="text" id="fieldNameInput"
+                   placeholder="e.g. Custom_Annual_Income__c">
+            <input type="text" id="objectContextInput"
+                   placeholder="Object: FinancialAccount"
+                   style="max-width:220px">
+            <button class="btn btn-primary" onclick="getAiSuggestion()">
+                Suggest Mapping
+            </button>
+        </div>
+        <div class="ai-result" id="aiResult">
+            Suggestion will appear here...
+        </div>
+    </div>
+
+    <!-- Natural Language Migration -->
+    <div class="ai-panel" style="margin-top:16px">
+        <div class="panel-header">
+            <span class="panel-title">
+                💬 Natural Language Migration
+                <span class="ai-badge">Gemini</span>
+            </span>
+        </div>
+        <p style="font-size:12px;color:#546e7a;margin-bottom:14px">
+            Type what you want to migrate in plain English.
+        </p>
+        <div class="nl-input-row">
+            <input type="text" id="nlInput"
+                   placeholder="e.g. migrate all financial accounts as a dry run">
+            <button class="btn btn-primary" onclick="naturalLanguageMigrate()">
+                Run with AI
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+    // ── STATE ──────────────────────────────────────────────────
+    let stompClient = null;
+    let activeJobId = null;
+    let subscription = null;
+
+    // ── WEBSOCKET CONNECTION ───────────────────────────────────
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.debug = null; // silence STOMP debug logs
+
+        stompClient.connect({}, function(frame) {
+            setConnected(true);
+            addLog('SYS', 'WebSocket connected to FSC-Bridge server', 'default');
+        }, function(error) {
+            setConnected(false);
+            addLog('SYS', 'WebSocket connection lost. Reconnecting...', 'failed');
+            setTimeout(connect, 3000); // auto-reconnect
+        });
+    }
+
+    function setConnected(connected) {
+        const dot = document.getElementById('connectionDot');
+        const status = document.getElementById('connectionStatus');
+        if (connected) {
+            dot.classList.add('connected');
+            status.textContent = 'Connected';
+        } else {
+            dot.classList.remove('connected');
+            status.textContent = 'Disconnected';
+        }
+    }
+
+    // Subscribe to a specific job's WebSocket topic
+    function subscribeToJob(jobId) {
+        // Unsubscribe from previous job if any
+        if (subscription) {
+            subscription.unsubscribe();
+        }
+
+        const topic = '/topic/migration-progress/' + jobId;
+        subscription = stompClient.subscribe(topic, function(message) {
+            const event = JSON.parse(message.body);
+            handleMigrationEvent(event);
+        });
+
+        addLog('SYS', 'Subscribed to job: ' + jobId, 'default');
+    }
+
+    // ── MIGRATION CONTROLS ─────────────────────────────────────
+    function startMigration(isDryRun) {
+        const jobName = document.getElementById('jobName').value
+            || 'Migration Job ' + new Date().toLocaleTimeString();
+        const sourceObject = document.getElementById('sourceObject').value;
+        const targetObject = document.getElementById('targetObject').value;
+
+        const payload = {
+            jobName: jobName,
+            sourceObject: sourceObject,
+            targetObject: targetObject,
+            dryRun: isDryRun
+        };
+
+        resetDashboard();
+        addLog('SYS', 'Starting ' + (isDryRun ? 'dry run' : 'real migration')
+            + ': ' + sourceObject + ' → ' + targetObject, 'started');
+
+        const endpoint = isDryRun
+            ? '/api/migration/dry-run'
+            : '/api/migration/start';
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(job => {
+            if (job.jobId) {
+                activeJobId = job.jobId;
+                document.getElementById('jobIdDisplay').textContent = job.jobId;
+                document.getElementById('jobIdBar').classList.remove('hidden');
+                subscribeToJob(job.jobId);
+                showToast('Migration started! Watching live events...', 'success');
+
+                // If completed synchronously (small jobs)
+                if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+                    updateFromJob(job);
+                    fetchAiSummary(job);
+                }
+            } else {
+                showToast('Error starting migration: ' + JSON.stringify(job), 'error');
+            }
+        })
+        .catch(err => {
+            addLog('SYS', 'Request failed: ' + err.message, 'failed');
+            showToast('Failed to start migration', 'error');
+        });
+    }
+
+    function triggerRollback() {
+        if (!activeJobId) return;
+        const objectType = document.getElementById('targetObject').value;
+
+        if (!confirm('Rollback job ' + activeJobId + '? This will delete all inserted records.')) return;
+
+        fetch('/api/migration/rollback/' + activeJobId + '?objectType=' + objectType, {
+            method: 'DELETE'
+        })
+        .then(res => res.json())
+        .then(result => {
+            addLog('ROLLBACK', 'Rollback complete: ' + result.deletedRecords + ' records deleted', 'rollback');
+            showToast('Rollback completed: ' + result.deletedRecords + ' records deleted', 'success');
+        })
+        .catch(err => showToast('Rollback failed: ' + err.message, 'error'));
+    }
+
+    // ── HANDLE INCOMING WEBSOCKET EVENTS ──────────────────────
+    function handleMigrationEvent(event) {
+        // Update stats
+        if (event.totalRecords > 0) {
+            document.getElementById('totalRecords').textContent = event.totalRecords;
+        }
+        if (event.successCount !== undefined) {
+            document.getElementById('successCount').textContent = event.successCount;
+        }
+        if (event.failureCount !== undefined) {
+            document.getElementById('failedCount').textContent = event.failureCount;
+        }
+
+        // Update progress bar
+        const pct = Math.round(event.progressPercent || 0);
+        const bar = document.getElementById('progressBar');
+        bar.style.width = pct + '%';
+        document.getElementById('progressPct').textContent = pct + '%';
+        document.getElementById('progressPctLarge').textContent = pct + '%';
+
+        // Update status
+        const status = event.jobStatus || 'RUNNING';
+        document.getElementById('jobStatus').textContent = status;
+
+        // Update progress label
+        const label = event.message || (event.successCount + '/' + event.totalRecords + ' records processed');
+        document.getElementById('progressLabel').textContent = label;
+
+        // Color the bar based on status
+        bar.className = 'progress-bar-fill';
+        if (status === 'COMPLETED') {
+            bar.classList.add('complete');
+            document.getElementById('rollbackBtn').style.display = 'block';
+            fetchAiSummary({ jobId: event.jobId, status: status,
+                totalRecords: event.totalRecords, successCount: event.successCount,
+                failureCount: event.failureCount, sourceObject: event.sourceObject,
+                targetObject: event.targetObject, dryRun: event.dryRun });
+        } else if (status === 'FAILED') {
+            bar.classList.add('failed');
+        }
+
+        // Add to event log
+        const logType = getLogType(event.eventType);
+        addLog(event.eventType, event.message || label, logType);
+    }
+
+    function getLogType(eventType) {
+        const map = {
+            'JOB_STARTED': 'started',
+            'RECORD_MIGRATED': 'migrated',
+            'RECORD_FAILED': 'failed',
+            'JOB_COMPLETED': 'completed',
+            'JOB_FAILED': 'failed',
+            'ROLLBACK_STARTED': 'rollback',
+            'ROLLBACK_COMPLETED': 'rollback'
+        };
+        return map[eventType] || 'default';
+    }
+
+    // ── AI FEATURES ────────────────────────────────────────────
+    function getAiSuggestion() {
+        const fieldName = document.getElementById('fieldNameInput').value.trim();
+        const objectContext = document.getElementById('objectContextInput').value.trim()
+            || 'FinancialAccount';
+
+        if (!fieldName) {
+            showToast('Please enter a field name', 'error');
+            return;
+        }
+
+        document.getElementById('aiResult').textContent = '🤖 Asking Gemini...';
+
+        fetch('/api/ai/suggest-mapping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fieldName: fieldName,
+                objectContext: objectContext,
+                sampleValues: ['sample1', 'sample2', 'sample3']
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('aiResult').textContent =
+                data.suggestion || 'No suggestion returned';
+        })
+        .catch(err => {
+            document.getElementById('aiResult').textContent = 'Error: ' + err.message;
+        });
+    }
+
+    function naturalLanguageMigrate() {
+        const request = document.getElementById('nlInput').value.trim();
+        if (!request) {
+            showToast('Please enter a migration request', 'error');
+            return;
+        }
+
+        addLog('AI', 'Natural language request: ' + request, 'started');
+
+        fetch('/api/ai/migrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ request: request })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.parsedJob) {
+                const job = data.parsedJob;
+                addLog('AI', 'Parsed: ' + job.sourceObject + ' → '
+                    + job.targetObject + ' (dryRun: ' + job.dryRun + ')', 'started');
+                if (data.aiSummary) {
+                    document.getElementById('aiSummary').textContent = data.aiSummary;
+                }
+                showToast('AI migration completed!', 'success');
+            } else {
+                showToast('AI could not parse request', 'error');
+            }
+        })
+        .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+
+    function fetchAiSummary(job) {
+        document.getElementById('aiSummary').textContent = '🤖 Generating AI summary...';
+
+        fetch('/api/ai/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(job)
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('aiSummary').textContent =
+                data.summary || 'Summary unavailable';
+        })
+        .catch(() => {
+            document.getElementById('aiSummary').textContent =
+                'AI summary unavailable. Check your Gemini API key.';
+        });
+    }
+
+    // ── UTILITIES ──────────────────────────────────────────────
+    function addLog(type, message, styleClass) {
+        const log = document.getElementById('eventLog');
+        const now = new Date().toLocaleTimeString('en', { hour12: false });
+
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `
+            <span class="log-time">${now}</span>
+            <span class="log-type type-${styleClass}">${type}</span>
+            <span class="log-msg">${message}</span>
+        `;
+
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function clearLog() {
+        document.getElementById('eventLog').innerHTML = '';
+    }
+
+    function resetDashboard() {
+        document.getElementById('totalRecords').textContent = '0';
+        document.getElementById('successCount').textContent = '0';
+        document.getElementById('failedCount').textContent = '0';
+        document.getElementById('progressPct').textContent = '0%';
+        document.getElementById('progressPctLarge').textContent = '0%';
+        document.getElementById('jobStatus').textContent = 'RUNNING';
+        document.getElementById('progressBar').style.width = '0%';
+        document.getElementById('progressBar').className = 'progress-bar-fill';
+        document.getElementById('progressLabel').textContent = 'Migration in progress...';
+        document.getElementById('aiSummary').innerHTML =
+            '<div class="summary-placeholder"><div class="icon">✨</div>Waiting for migration to complete...</div>';
+        document.getElementById('rollbackBtn').style.display = 'none';
+        clearLog();
+    }
+
+    function updateFromJob(job) {
+        document.getElementById('totalRecords').textContent = job.totalRecords || 0;
+        document.getElementById('successCount').textContent = job.successCount || 0;
+        document.getElementById('failedCount').textContent = job.failureCount || 0;
+        document.getElementById('jobStatus').textContent = job.status;
+        const pct = job.totalRecords > 0
+            ? Math.round(job.successCount / job.totalRecords * 100)
+            : 100;
+        document.getElementById('progressPct').textContent = pct + '%';
+        document.getElementById('progressPctLarge').textContent = pct + '%';
+        document.getElementById('progressBar').style.width = pct + '%';
+    }
+
+    function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type + ' show';
+        setTimeout(() => { toast.className = 'toast ' + type; }, 3500);
+    }
+
+    // ── INIT ───────────────────────────────────────────────────
+    connect();
+</script>
+</body>
+</html>

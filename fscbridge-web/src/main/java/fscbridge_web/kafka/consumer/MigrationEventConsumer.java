@@ -3,6 +3,7 @@ package fscbridge_web.kafka.consumer;
 import fscbridge_web.kafka.config.KafkaConfig;
 import fscbridge_web.kafka.event.MigrationEvent;
 import fscbridge_web.metrics.MigrationMetrics;
+import fscbridge_web.websocket.MigrationProgressHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Service;
 public class MigrationEventConsumer {
 
     private final MigrationMetrics migrationMetrics;
-
+    private final MigrationProgressHandler progressHandler;
     @KafkaListener(
             topics = KafkaConfig.MIGRATION_EVENTS_TOPIC,
             groupId = "fscbridge-group",
@@ -45,6 +46,7 @@ public class MigrationEventConsumer {
                 case "ROLLBACK_COMPLETED" -> handleRollbackCompleted(event);
                 default -> log.warn("Unknown event type: {}", event.getEventType());
             }
+            progressHandler.sendProgressUpdate(event);
         } catch (Exception e) {
             log.error("Error processing event {} for job {}: {}",
                     event.getEventType(),
@@ -62,6 +64,8 @@ public class MigrationEventConsumer {
                 event.getEventType(),
                 event.getJobId(),
                 event.getMessage());
+
+        progressHandler.sendProgressUpdate(event);
     }
 
     private void handleJobStarted(MigrationEvent event) {
