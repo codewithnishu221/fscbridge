@@ -1,0 +1,97 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fscbridge-postgres
+
+    environment:
+      POSTGRES_DB: fscbridge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fscbridge123}
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fscbridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    restart: unless-stopped
+    networks:
+      - fscbridge-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fscbridge-app
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      SPRING_PROFILE: prod
+      JASYPT_PASSWORD: ${JASYPT_PASSWORD}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fscbridge
+      SPRING_DATASOURCE_USERNAME: fscbridge_user
+      SPRING_DATASOURCE_PASSWORD: fscbridge_pass
+
+      SALESFORCE_ORG_URL: ${SALESFORCE_ORG_URL}
+      SALESFORCE_CLIENT_ID: ${SALESFORCE_CLIENT_ID}
+      SALESFORCE_CLIENT_SECRET: ${SALESFORCE_CLIENT_SECRET}
+
+      # kafka aivan keys here
+      AIVAN_API_KEY: ${AIVAN_API_KEY}
+      AIVAN_API_SECRET: ${AIVAN_API_SECRET}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -XX:+UseG1GC
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    restart: unless-stopped
+
+    networks:
+      - fscbridge-network
+
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  fscbridge-network:
+    driver: bridge
+
+

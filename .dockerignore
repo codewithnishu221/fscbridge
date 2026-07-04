@@ -1,0 +1,23 @@
+# Build output - don't copy into Docker build content
+target/
+
+#IDE files
+.idea/
+*.iml
+
+# Sensitive config files - NEVER in Docker image
+application-local.yml
+application-prod.yml
+*.env
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore/
