@@ -9,11 +9,13 @@ import fscbridge_core.model.SalesforceRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class AuditService {
 
@@ -98,6 +100,7 @@ public class AuditService {
         auditLogRepository.save(entry);
     }
 
+    @Transactional(readOnly = true)
     public List<String> getTargetIdsForRollback(String jobId) {
         log.info("Preparing rollback for job: {}", jobId);
 
@@ -139,14 +142,17 @@ public class AuditService {
                 .build();
         auditLogRepository.save(entry);
     }
+    @Transactional(readOnly = true)
     public List<AuditLog> getJobHistory(String jobId){
         return auditLogRepository.findByJobId(jobId);
     }
+    @Transactional(readOnly = true)
     public long getSuccessCount(String jobId){
         return auditLogRepository.countByJobIdAndActionAndSuccess(
                 jobId, "RECORD_MIGRATED", true
         );
     }
+    @Transactional(readOnly = true)
     public long getFailureCount(String jobId){
         return auditLogRepository.countByJobIdAndActionAndSuccess(
                 jobId, "RECORD_FAILED", false

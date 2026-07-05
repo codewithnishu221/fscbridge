@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
@@ -34,7 +35,7 @@ public class SalesforceClient {
                     + "/query?q="
                     + soqlQuery.replace(" ", "+");
             while(queryUrl!= null) {
-                ResponseEntity<Map> response = restTemplate.exchange(
+                ResponseEntity<Map> response = executeWithRetry(
                         queryUrl,
                         HttpMethod.GET,
                         new HttpEntity<>(buildHeaders()),
@@ -53,9 +54,6 @@ public class SalesforceClient {
                 int totalSize = (Integer) responseBody.getOrDefault("totalSize", 0);
                 log.info("Query returned {} records", totalSize);
 
-                // Convert each raw map into a SalesforceRecord object
-                // List<SalesforceRecord> records = new ArrayList<>();
-
                 for (Map<String, Object> raw : rawRecords) {
 
                     Map<String, Object> attributes =
@@ -72,20 +70,6 @@ public class SalesforceClient {
                         oAuthService.getInstanceUrl() + responseBody.get("nextRecordsUrl");
             }
             return allRecords;
-//                String objectType = attributes != null
-//                        ? (String) attributes.get("type")
-//                        : "Unknown";
-//
-//                SalesforceRecord record = SalesforceRecord.builder()
-//                        .id((String) raw.get("Id"))
-//                        .objectType(objectType)
-//                        .fields(raw)
-//                        .build();
-//
-//                records.add(record);
-//            }
-
-//            return records;
 
         } catch (FsBridgeException e) {
             throw e;
@@ -108,7 +92,7 @@ public class SalesforceClient {
                     + "/query?q="
                     + soqlQuery.replace(" ", "+");
 
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map> response = executeWithRetry(
                     queryUrl,
                     HttpMethod.GET,
                     new HttpEntity<>(buildHeaders()),
@@ -156,8 +140,9 @@ public class SalesforceClient {
             HttpEntity<Map<String, Object>> request =
                     new HttpEntity<>(cleanFields, buildHeaders());
 
-            ResponseEntity<Map> response = restTemplate.postForEntity(
+            ResponseEntity<Map> response = executeWithRetry(
                     insertUrl,
+                    HttpMethod.POST,
                     request,
                     Map.class
             );
@@ -201,7 +186,7 @@ public class SalesforceClient {
                     + "/"
                     + recordId;
 
-            restTemplate.exchange(
+            executeWithRetry(
                     deleteUrl,
                     HttpMethod.DELETE,
                     new HttpEntity<>(buildHeaders()),
@@ -233,5 +218,25 @@ public class SalesforceClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", "Bearer " + oAuthService.getAccessToken());
         return headers;
+    }
+
+    private <T> ResponseEntity<T> executeWithRetry(
+            String url, HttpMethod method, HttpEntity<?> requestEntity,
+            Class<T> responseType) {
+        try {
+            return restTemplate.exchange(url, method, requestEntity, responseType);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                log.warn("Received 401 from Salesforce. Refreshing token and retrying...");
+                oAuthService.refreshToken();
+                HttpHeaders freshHeaders = buildHeaders();
+                Object body = requestEntity.getBody();
+                HttpEntity<?> retryRequest = body != null
+                        ? new HttpEntity<>(body, freshHeaders)
+                        : new HttpEntity<>(freshHeaders);
+                return restTemplate.exchange(url, method, retryRequest, responseType);
+            }
+            throw e;
+        }
     }
 }

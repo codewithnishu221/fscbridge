@@ -29,7 +29,8 @@ public class MigrationJobConfig {
     private final AuditService auditService;
 
 
-    private static final int CHUNK_SIZE = 10;
+    @Value("${migration.chunk-size:10}")
+    private int chunkSize;
 
     @Value("${migration.max-records:200}")
     private int maxRecords;
@@ -68,7 +69,7 @@ public class MigrationJobConfig {
 
         return new StepBuilder("migrationStep-" + jobId, jobRepository)
                 .<SalesforceRecord, SalesforceRecord>chunk(
-                        CHUNK_SIZE, transactionManager)
+                        chunkSize, transactionManager)
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)

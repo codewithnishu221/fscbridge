@@ -65,12 +65,6 @@ public class MigrationService {
             if (job.isDryRun()) {
                 log.info("DRY RUN ENABLED - No records will be inserted");
             }
-//            else {
-//
-//                String soqlQuery = buildSoqlQuery(job.getSourceObject());
-//
-//                sourceRecords = salesforceClient.queryRecords(soqlQuery);
-//            }
 
             job.setTotalRecords(sourceRecords.size());
             log.info("Processing {} records", sourceRecords.size());
