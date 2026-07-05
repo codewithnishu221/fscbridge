@@ -11,5 +11,6 @@ target/
 # Logs
 logs/
 *.log
-*.log"
-**/JasyptEncryptionUtil.java"
+**/JasyptEncryptionUtil.java
+
+.env

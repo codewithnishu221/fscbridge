@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.fscbridge</groupId>
+    <artifactId>fscbridge-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>FSC-Bridge Parent</name>
+    <description>FSC Managed Package to FSC Core migration engine - Parent POM</description>
+
+    <modules>
+        <module>fscbridge-core</module>
+        <module>fscbridge-connector</module>
+        <module>fscbridge-mapper</module>
+        <module>fscbridge-audit</module>
+        <module>fscbridge-web</module>
+    </modules>
+</project>

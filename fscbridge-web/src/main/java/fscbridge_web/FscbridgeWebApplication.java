@@ -5,8 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication(scanBasePackages = {
         "fscbridge_web",
-        "fsbridge_connector",
-        "fsbridge_mapper",
+        "fscbridge_connector",
+        "fscbridge_mapper",
         "fscbridge_audit"
 })
 public class FscbridgeWebApplication {

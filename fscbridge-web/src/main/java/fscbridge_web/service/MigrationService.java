@@ -5,12 +5,13 @@ import fscbridge_core.enums.JobStatus;
 import fscbridge_core.exception.FsBridgeException;
 import fscbridge_core.model.MigrationJob;
 import fscbridge_core.model.SalesforceRecord;
-import fsbridge_connector.client.SalesforceClient;
-import fsbridge_mapper.service.FieldMapperService;
+import fscbridge_connector.client.SalesforceClient;
+import fscbridge_mapper.service.FieldMapperService;
 import fscbridge_web.kafka.producer.MigrationEventProducer;
 import fscbridge_web.metrics.MigrationMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,9 @@ public class MigrationService {
     private final AuditService auditService;
     private final MigrationMetrics migrationMetrics;
     private final MigrationEventProducer eventProducer;
+
+    @Value("${migration.max-records:200}")
+    private int maxRecords;
 
     public MigrationJob runMigration(MigrationJob job) {
 
@@ -200,6 +204,6 @@ public class MigrationService {
 
 
     private String buildSoqlQuery(String objectType) {
-        return "SELECT FIELDS(ALL) FROM " + objectType + " LIMIT 200";
+        return "SELECT FIELDS(ALL) FROM " + objectType + " LIMIT " + maxRecords;
     }
 }

@@ -23,6 +23,7 @@ RUN addgroup -S fscbridge && adduser -S fscbridge -G fscbridge
 WORKDIR /app
 
 COPY --from=builder /build/fscbridge-web/target/fscbridge-web-*.jar app.jar
+COPY --from=builder /build/fscbridge-web/src/main/resources/certs/ /app/certs/
 
 RUN mkdir -p /app/logs && chown -R fscbridge:fscbridge /app
 

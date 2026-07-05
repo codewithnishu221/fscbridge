@@ -78,10 +78,10 @@ public class MigrationEventConsumer {
     }
 
     private void handleRecordMigrated(MigrationEvent event) {
-        log.debug("Record migrated: {} -> {} | progress: %.1f%%",
+        log.debug("Record migrated: {} -> {} | progress: {}%",
                 event.getSourceRecordId(),
                 event.getTargetRecordId(),
-                String.format("%.1f",event.getProgressPercent()));
+                String.format("%.1f", event.getProgressPercent()));
 
         if (event.getSuccessCount() % 10 == 0) {
             log.info("Progress: {}/{} records | {}%",

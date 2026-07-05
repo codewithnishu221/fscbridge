@@ -1,7 +1,7 @@
-package fsbridge_connector.client;
+package fscbridge_connector.client;
 
-import fsbridge_connector.auth.OAuthService;
-import fsbridge_connector.config.SalesforceProperties;
+import fscbridge_connector.auth.OAuthService;
+import fscbridge_connector.config.SalesforceProperties;
 import fscbridge_core.exception.FsBridgeException;
 import fscbridge_core.model.SalesforceRecord;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,82 @@ public class SalesforceClient {
         log.info("Executing SOQL query: {}", soqlQuery);
 
         try {
+            List<SalesforceRecord> allRecords = new ArrayList<>();
              String queryUrl = oAuthService.getInstanceUrl()
+                    + "/services/data/"
+                    + properties.getApiVersion()
+                    + "/query?q="
+                    + soqlQuery.replace(" ", "+");
+            while(queryUrl!= null) {
+                ResponseEntity<Map> response = restTemplate.exchange(
+                        queryUrl,
+                        HttpMethod.GET,
+                        new HttpEntity<>(buildHeaders()),
+                        Map.class
+                );
+
+                Map<String, Object> responseBody = response.getBody();
+                if (responseBody == null) {
+                    log.warn("Empty response body from Salesforce query");
+                    return Collections.emptyList();
+                }
+
+                List<Map<String, Object>> rawRecords =
+                        (List<Map<String, Object>>) responseBody.get("records");
+
+                int totalSize = (Integer) responseBody.getOrDefault("totalSize", 0);
+                log.info("Query returned {} records", totalSize);
+
+                // Convert each raw map into a SalesforceRecord object
+                // List<SalesforceRecord> records = new ArrayList<>();
+
+                for (Map<String, Object> raw : rawRecords) {
+
+                    Map<String, Object> attributes =
+                            (Map<String, Object>) raw.get("attributes");
+                    allRecords.add(SalesforceRecord.builder()
+                            .id((String) raw.get("Id"))
+                            .objectType(attributes != null ?
+                                    (String) attributes.get("type") : "Unknown")
+                                    .fields(raw)
+                                    .build());
+                }
+                boolean done = (Boolean) responseBody.getOrDefault("done", true);
+                queryUrl = done ? null :
+                        oAuthService.getInstanceUrl() + responseBody.get("nextRecordsUrl");
+            }
+            return allRecords;
+//                String objectType = attributes != null
+//                        ? (String) attributes.get("type")
+//                        : "Unknown";
+//
+//                SalesforceRecord record = SalesforceRecord.builder()
+//                        .id((String) raw.get("Id"))
+//                        .objectType(objectType)
+//                        .fields(raw)
+//                        .build();
+//
+//                records.add(record);
+//            }
+
+//            return records;
+
+        } catch (FsBridgeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to query Salesforce records: {}", e.getMessage());
+            throw new FsBridgeException("QUERY_FAILED",
+                    "Failed to query records: " + e.getMessage(), e);
+        }
+    }
+
+
+    @SuppressWarnings("unchecked")
+    public int countRecords(String soqlQuery) {
+        log.info("Executing count query: {}", soqlQuery);
+
+        try {
+            String queryUrl = oAuthService.getInstanceUrl()
                     + "/services/data/"
                     + properties.getApiVersion()
                     + "/query?q="
@@ -42,48 +117,19 @@ public class SalesforceClient {
 
             Map<String, Object> responseBody = response.getBody();
             if (responseBody == null) {
-                log.warn("Empty response body from Salesforce query");
-                return Collections.emptyList();
+                log.warn("Empty response from count query");
+                return 0;
             }
-
-            List<Map<String, Object>> rawRecords =
-                    (List<Map<String, Object>>) responseBody.get("records");
 
             int totalSize = (Integer) responseBody.getOrDefault("totalSize", 0);
-            log.info("Query returned {} records", totalSize);
+            log.info("Count query returned {} records", totalSize);
+            return totalSize;
 
-            // Convert each raw map into a SalesforceRecord object
-            List<SalesforceRecord> records = new ArrayList<>();
-
-            for (Map<String, Object> raw : rawRecords) {
-
-                Map<String, Object> attributes =
-                        (Map<String, Object>) raw.get("attributes");
-
-                String objectType = attributes != null
-                        ? (String) attributes.get("type")
-                        : "Unknown";
-
-                SalesforceRecord record = SalesforceRecord.builder()
-                        .id((String) raw.get("Id"))
-                        .objectType(objectType)
-                        .fields(raw)
-                        .build();
-
-                records.add(record);
-            }
-
-            return records;
-
-        } catch (FsBridgeException e) {
-            throw e;
         } catch (Exception e) {
-            log.error("Failed to query Salesforce records: {}", e.getMessage());
-            throw new FsBridgeException("QUERY_FAILED",
-                    "Failed to query records: " + e.getMessage(), e);
+            log.error("Failed to execute count query: {}", e.getMessage());
+            return 0;
         }
     }
-
 
     @SuppressWarnings("unchecked")
     public String insertRecord(String objectType, Map<String, Object> fields) {

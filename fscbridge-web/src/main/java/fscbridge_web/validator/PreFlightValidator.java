@@ -1,10 +1,10 @@
 package fscbridge_web.validator;
 
-import fsbridge_connector.auth.OAuthService;
-import fsbridge_connector.client.SalesforceClient;
+import fscbridge_connector.auth.OAuthService;
+import fscbridge_connector.client.SalesforceClient;
 import fscbridge_core.model.FieldMapping;
 import fscbridge_core.model.SalesforceRecord;
-import fsbridge_mapper.config.MappingLoader;
+import fscbridge_mapper.config.MappingLoader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -126,9 +126,7 @@ public class PreFlightValidator {
         log.debug("Running check: Record Count for {}", sourceObject);
         try {
             String countQuery = "SELECT COUNT() FROM " + sourceObject;
-            List<SalesforceRecord> result =
-                    salesforceClient.queryRecords(countQuery);
-            return result.size();
+            return salesforceClient.countRecords(countQuery);
         } catch (Exception e) {
             log.warn("Could not get record count: {}", e.getMessage());
             return 0;

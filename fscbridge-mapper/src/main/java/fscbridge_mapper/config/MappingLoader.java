@@ -1,4 +1,4 @@
-package fsbridge_mapper.config;
+package fscbridge_mapper.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;

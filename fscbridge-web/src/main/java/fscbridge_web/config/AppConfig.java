@@ -1,7 +1,7 @@
 package fscbridge_web.config;
 
-import fsbridge_connector.config.SalesforceProperties;
-import fsbridge_connector.config.RestTemplateConfig;
+import fscbridge_connector.config.SalesforceProperties;
+import fscbridge_connector.config.RestTemplateConfig;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

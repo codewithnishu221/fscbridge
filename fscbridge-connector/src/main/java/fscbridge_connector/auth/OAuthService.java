@@ -1,6 +1,6 @@
-package fsbridge_connector.auth;
+package fscbridge_connector.auth;
 
-import fsbridge_connector.config.SalesforceProperties;
+import fscbridge_connector.config.SalesforceProperties;
 import fscbridge_core.exception.FsBridgeException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

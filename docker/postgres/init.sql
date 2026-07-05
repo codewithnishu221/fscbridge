@@ -13,7 +13,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 CREATE TABLE IF NOT EXISTS audit_log (
      id            BIGSERIAL PRIMARY KEY,
      job_id        VARCHAR(255) NOT NULL,
-     action         VARCHAR(100) NOT NULL,
+     action         VARCHAR(255) NOT NULL,
      source_record_id VARCHAR(255),
      target_record_id VARCHAR(255),
      object_type      VARCHAR(255),
@@ -27,6 +27,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_job_id
 
 CREATE INDEX IF NOT EXISTS idx_audit_job_action
        ON audit_log(created_at DESC);
+
+ALTER TABLE audit_log OWNER TO fscbridge_user;
 
 DO $$
 BEGIN

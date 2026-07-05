@@ -1,7 +1,7 @@
 package fscbridge_web.batch;
 
 import fscbridge_core.model.SalesforceRecord;
-import fsbridge_mapper.service.FieldMapperService;
+import fscbridge_mapper.service.FieldMapperService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.item.ItemProcessor;

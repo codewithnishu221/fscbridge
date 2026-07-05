@@ -58,7 +58,7 @@
 
         <!-- connector and mapper still use com.fsbridge groupId -->
         <dependency>
-            <groupId>com.fsbridge</groupId>
+            <groupId>com.fscbridge</groupId>
             <artifactId>fscbridge-connector</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>

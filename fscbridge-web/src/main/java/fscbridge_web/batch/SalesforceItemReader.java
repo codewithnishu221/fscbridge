@@ -1,6 +1,6 @@
 package fscbridge_web.batch;
 
-import fsbridge_connector.client.SalesforceClient;
+import fscbridge_connector.client.SalesforceClient;
 import fscbridge_core.model.SalesforceRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.item.ItemReader;

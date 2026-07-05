@@ -54,8 +54,8 @@
 
         <logger name="fscbridge_web" level="DEBUG"/>
         <logger name="fscbridge_audit" level="DEBUG"/>
-        <logger name="fsbridge_connector" level="DEBUG"/>
-        <logger name="fsbridge_mapper" level="DEBUG"/>
+        <logger name="fscbridge_connector" level="DEBUG"/>
+        <logger name="fscbridge_mapper" level="DEBUG"/>
         <logger name="fscbridge_core" level="DEBUG"/>
 
         <logger name="org.springframework.batch" level="INFO"/>
@@ -76,8 +76,8 @@
         <!-- Our app: INFO in prod -->
         <logger name="fscbridge_web" level="INFO"/>
         <logger name="fscbridge_audit" level="INFO"/>
-        <logger name="fsbridge_connector" level="INFO"/>
-        <logger name="fsbridge_mapper" level="INFO"/>
+        <logger name="fscbridge_connector" level="INFO"/>
+        <logger name="fscbridge_mapper" level="INFO"/>
 
         <!-- Never show Hibernate SQL in prod -->
         <logger name="org.hibernate.SQL" level="WARN"/>

@@ -1,9 +1,9 @@
 package fscbridge_web.batch;
 
 import fscbridge_audit.service.AuditService;
-import fsbridge_connector.client.SalesforceClient;
+import fscbridge_connector.client.SalesforceClient;
 import fscbridge_core.model.SalesforceRecord;
-import fsbridge_mapper.service.FieldMapperService;
+import fscbridge_mapper.service.FieldMapperService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
@@ -11,6 +11,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,8 +31,8 @@ public class MigrationJobConfig {
 
     private static final int CHUNK_SIZE = 10;
 
-
-    private static final int MAX_RECORDS = 200;
+    @Value("${migration.max-records:200}")
+    private int maxRecords;
 
 
     public Job createMigrationJob(String sourceObject,
@@ -57,7 +58,7 @@ public class MigrationJobConfig {
                                      boolean dryRun) {
 
         SalesforceItemReader reader = new SalesforceItemReader(
-                salesforceClient, sourceObject, MAX_RECORDS);
+                salesforceClient, sourceObject, maxRecords);
 
         MappingItemProcessor processor = new MappingItemProcessor(
                 fieldMapperService, targetObject);

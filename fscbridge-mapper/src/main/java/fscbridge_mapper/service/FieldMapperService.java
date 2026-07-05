@@ -1,6 +1,6 @@
-package fsbridge_mapper.service;
+package fscbridge_mapper.service;
 
-import fsbridge_mapper.config.MappingLoader;
+import fscbridge_mapper.config.MappingLoader;
 import fscbridge_core.exception.FsBridgeException;
 import fscbridge_core.model.FieldMapping;
 import fscbridge_core.model.SalesforceRecord;
