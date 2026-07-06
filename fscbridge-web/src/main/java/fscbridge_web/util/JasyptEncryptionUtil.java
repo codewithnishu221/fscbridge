@@ -6,29 +6,33 @@ public class JasyptEncryptionUtil {
 
     public static void main(String[] args) {
 
-       String masterPassword = "fscbridge-secret-key-2025";
+        String masterPassword = System.getProperty("jasypt.encryptor.password",
+                System.getenv("JASYPT_PASSWORD"));
+        if (masterPassword == null || masterPassword.isBlank()) {
+            System.err.println("ERROR: Set Jasypt password via:");
+            System.err.println("  -Djava.ext.dirs= -Djasypt.encryptor.password=your-password");
+            System.err.println("  or JASYPT_PASSWORD environment variable");
+            System.exit(1);
+            return;
+        }
 
-        String orgUrl = "";
-        String clientId = "";
-        String clientSecret = "";
-        String geminiApiKey = "";
-        StandardPBEStringEncryptor encryptor =
-                new StandardPBEStringEncryptor();
+        if (args.length < 1) {
+            System.err.println("Usage: java JasyptEncryptionUtil <value1> [value2 ...]");
+            System.err.println("  Encrypts one or more values and prints ENC(...) output.");
+            System.exit(1);
+            return;
+        }
+
+        StandardPBEStringEncryptor encryptor = new StandardPBEStringEncryptor();
         encryptor.setPassword(masterPassword);
         encryptor.setAlgorithm("PBEWithMD5AndDES");
 
-        String encryptedOrgUrl = encryptor.encrypt(orgUrl);
-        String encryptedClientId = encryptor.encrypt(clientId);
-        String encryptedClientSecret = encryptor.encrypt(clientSecret);
-        String encryptedGeminiKey = encryptor.encrypt(geminiApiKey);
-
-        System.out.println("\n=== Copy these into application.yml ===");
-        System.out.println("orgUrl:       ENC(" + encryptedOrgUrl + ")");
-        System.out.println("clientId:     ENC(" + encryptedClientId + ")");
-        System.out.println("clientSecret: ENC(" + encryptedClientSecret + ")");
-        System.out.println("geminiApiKey: ENC(" + encryptedGeminiKey + ")");
-        System.out.println("=======================================\n");
-        System.out.println("Start app with:");
-        System.out.println("-Djasypt.encryptor.password=fscbridge-secret-key-2025");
+        System.out.println("\n=== Encrypted values (copy into application.yml) ===");
+        for (int i = 0; i < args.length; i++) {
+            String encrypted = encryptor.encrypt(args[i]);
+            System.out.printf("  arg%d: ENC(%s)%n", i + 1, encrypted);
+        }
+        System.out.println("==================================================\n");
+        System.out.println("Start app with: -Djasypt.encryptor.password=<your-password>");
     }
 }

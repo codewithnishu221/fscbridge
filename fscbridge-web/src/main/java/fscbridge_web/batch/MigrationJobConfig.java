@@ -14,7 +14,9 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.web.client.RestClientException;
 
 
 @Slf4j
@@ -74,7 +76,8 @@ public class MigrationJobConfig {
                 .processor(processor)
                 .writer(writer)
                 .faultTolerant()
-                .skip(Exception.class)
+                .skip(RestClientException.class)
+                .skip(DataAccessException.class)
                 .skipLimit(10)
                 .build();
     }
